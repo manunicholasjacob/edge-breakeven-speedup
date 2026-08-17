@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this software or its results, please cite it as below."
+title: "The Break-Even Parallel Speedup: When Multithreading Saves Energy for Edge CPU Inference"
+authors:
+  - family-names: "Jacob"
+    given-names: "Manu Nicholas"
+    orcid: "https://orcid.org/0009-0007-6589-6572"
+type: software
+repository-code: "https://github.com/manunicholasjacob/edge-breakeven-speedup"
+url: "http://manunicholasjacob.com/"
+version: "1.0.0"
+date-released: "2026-08-17"
+keywords:
+  - "edge computing"
+  - "energy efficiency"
+  - "multithreading"
+  - "parallel speedup"
+  - "Raspberry Pi"
+  - "Cortex-A76"
+  - "DNN inference"
+  - "power measurement"
