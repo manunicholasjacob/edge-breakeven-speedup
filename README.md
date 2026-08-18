@@ -1,5 +1,7 @@
 # The Break-Even Parallel Speedup
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21987261.svg)](https://doi.org/10.5281/zenodo.21987261)
+
 **When does multithreading actually save energy on an edge CPU?**
 
 Running inference on every core is the default on edge CPUs, on the reasoning that finishing sooner
