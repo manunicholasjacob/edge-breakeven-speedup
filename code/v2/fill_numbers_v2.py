@@ -431,10 +431,17 @@ if th:
 # tables ---------------------------------------------------------------------
 rows = []
 for khz, P0v in idle_rows:
-    tot2 = board_threshold(khz, 2, False)
-    dyn2 = board_threshold(khz, 2, True)
-    tot4 = board_threshold(khz, 4, False)
-    dyn4 = board_threshold(khz, 4, True)
+    # Thresholds are reported only at 2400 MHz. The pure-load control shows the
+    # summed PMIC rails do not report board power faithfully at 1500 MHz under
+    # multi-core load, so any threshold derived from power there would be
+    # unsound; the floor itself is a single-core-idle measurement and stands.
+    if khz == K:
+        tot2 = board_threshold(khz, 2, False)
+        dyn2 = board_threshold(khz, 2, True)
+        tot4 = board_threshold(khz, 4, False)
+        dyn4 = board_threshold(khz, 4, True)
+    else:
+        tot2 = dyn2 = tot4 = dyn4 = None
     fmt = lambda x: f"{x:.2f}" if x else "--"
     rows.append(f"{khz//1000} & {P0v:.2f} & {fmt(tot2)} & {fmt(dyn2)} & "
                 f"{fmt(tot4)} & {fmt(dyn4)} \\\\")
@@ -1681,6 +1688,180 @@ for _k, _v in _seb.items():
     if max(_v) > 1.25 * st.median(_v):
         _seh += 1
 put("npBimodalSpinECells", f"{_seh} of {_sec}")
+
+
+# ---- does the instrument perturb what it measures? -------------------------
+# The sampler runs on the machine under test. Rather than assert a direction
+# for its bias, vary how often it runs and see whether the answer moves.
+_sr = [r for r in load(os.path.join(D2, "E_samplerate.jsonl"))
+       if "P_mean_W" in r]
+if _sr:
+    _sb2 = defaultdict(list)
+    for r in _sr:
+        _sb2[(r["threads"], r["period_ms"])].append(r)
+    _rates, _spread = {}, {}
+    for th in (1, 4):
+        ps = [(p, med([x["P_mean_W"] for x in v]))
+              for (t_, p), v in _sb2.items() if t_ == th]
+        ls = [med([x["lat_median_ms"] for x in v])
+              for (t_, p), v in _sb2.items() if t_ == th]
+        rr = [med([x["n_pmic_samples"] / x["pmic_span_s"] for x in v])
+              for (t_, p), v in _sb2.items() if t_ == th]
+        if len(ps) > 1:
+            vals = [v for _, v in ps]
+            _spread[th] = 100 * (max(vals) - min(vals)) / min(vals)
+            _rates[th] = (min(rr), max(rr))
+            put("npSampleSpread" + ("One" if th == 1 else "Four"),
+                f"{_spread[th]:.1f}")
+            put("npSampleLatSpread" + ("One" if th == 1 else "Four"),
+                f"{100*(max(ls)-min(ls))/min(ls):.1f}")
+    if _rates:
+        lo = min(r[0] for r in _rates.values())
+        hi = max(r[1] for r in _rates.values())
+        put("npSampleRateLo", f"{lo:.1f}")
+        put("npSampleRateHi", f"{hi:.0f}")
+        put("npSampleRateFactor", f"{hi/lo:.0f}")
+
+# ---- what a live thread pool costs while the device does nothing -----------
+_si = [r for r in load(os.path.join(D2, "E_spinidle.jsonl"))
+       if "P_mean_W" in r]
+if _si:
+    _sib = defaultdict(dict)
+    for r in _si:
+        k = "none" if r["threads"] == 0 else "t%d/s%s" % (r["threads"],
+                                                          r["spin"])
+        _sib[r["rep"]][k] = r["P_mean_W"]
+    for th in (1, 4):
+        d = [_sib[r]["t%d/s1" % th] - _sib[r]["t%d/s0" % th]
+             for r in _sib
+             if "t%d/s1" % th in _sib[r] and "t%d/s0" % th in _sib[r]]
+        if d:
+            tag = "One" if th == 1 else "Four"
+            put("npSpinIdleDelta" + tag, f"{1000*st.mean(d):.0f}")
+            put("npSpinIdlePos" + tag,
+                "%d of %d" % (sum(1 for x in d if x > 0), len(d)))
+    _nones = [_sib[r]["none"] for r in _sib if "none" in _sib[r]]
+    if len(_nones) > 1:
+        put("npSpinIdleDriftPct",
+            f"{100*(max(_nones)-min(_nones))/min(_nones):.0f}")
+
+# ---- the floor, watched for long enough to see it move ---------------------
+_fd = [r for r in load(os.path.join(D2, "E_floordrift.jsonl"))
+       if "P_mean_W" in r]
+if len(_fd) > 3:
+    _fd.sort(key=lambda r: r.get("idx", 0))
+    _pw = [r["P_mean_W"] for r in _fd]
+    put("npDriftN", str(len(_fd)))
+    put("npDriftMinutes", f"{max(r['elapsed_s'] for r in _fd)/60:.0f}")
+    put("npDriftLo", f"{min(_pw):.2f}")
+    put("npDriftHi", f"{max(_pw):.2f}")
+    put("npDriftPct", f"{100*(max(_pw)-min(_pw))/min(_pw):.0f}")
+    _t = [r.get("temp_end_c") for r in _fd if r.get("temp_end_c")]
+    if _t:
+        put("npDriftTempLo", f"{min(_t):.0f}")
+        put("npDriftTempHi", f"{max(_t):.0f}")
+
+
+
+# ===================== the duty-cycle test, done with matched work ==========
+# Two earlier attempts got the comparison wrong: the first fixed the period but
+# at duty cycles too low to discriminate, the second fixed the duty cycle,
+# which makes the two arms serve different numbers of inferences. This fixes
+# the period from the one-thread service time and uses it for both arms, so W
+# and T are identical, at duty cycles where the model and a null predictor
+# disagree.
+_d3 = [r for r in load(os.path.join(D2, "E_duty3.jsonl"))
+       if r.get("model") != "__idle__" and "P_mean_W" in r]
+_d3i = [r for r in load(os.path.join(D2, "E_duty3.jsonl"))
+        if r.get("model") == "__idle__" and "P_mean_W" in r]
+if _d3 and _d3i and by.get(K):
+    P0d3 = med([r["P_mean_W"] for r in _d3i])
+    put("npDutyThreeFloor", f"{P0d3:.2f}")
+
+    def _aliased(r):
+        """The sampler locks to the workload period and can miss the burst.
+
+        Unbiased integration needs the burst to be sampled. When the period is
+        close to an integer multiple of the sampling interval the phase does
+        not drift, and when the burst is shorter than one sampling interval the
+        sampler can sit in the idle gap every period. Both conditions together
+        make a cell unusable; either alone does not.
+        """
+        si = 1000.0 * r["pmic_span_s"] / r["n_pmic_samples"]
+        ratio = r["period_ms"] / si
+        return (abs(ratio - round(ratio)) < 0.06 and round(ratio) >= 1
+                and r["lat_median_ms"] / si < 1.0)
+
+    d3b = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    excluded = set()
+    for r in _d3:
+        d3b[r["model"]][r["one_thread_duty"]][r["threads"]].append(r)
+        if _aliased(r):
+            excluded.add((r["model"], r["one_thread_duty"]))
+    errs, nulls, meas_all, duties = [], [], [], []
+    for m in d3b:
+        for d1 in d3b[m]:
+            if (m, d1) in excluded:
+                continue
+            d = d3b[m][d1]
+            if 1 not in d or 4 not in d:
+                continue
+            e1 = med([r["energy_per_inf_mJ"] for r in d[1]])
+            e4 = med([r["energy_per_inf_mJ"] for r in d[4]])
+            t1 = cell(K, m, 1, "lat_median_ms")
+            t4 = cell(K, m, 4, "lat_median_ms")
+            p1 = cell(K, m, 1, "P_mean_W")
+            p4 = cell(K, m, 4, "P_mean_W")
+            if None in (t1, t4, p1, p4):
+                continue
+            T = (t1 / 1000.0) / d1
+            pred = ((P0d3 * T + (p4 - P0d3) * t4 / 1000.0) /
+                    (P0d3 * T + (p1 - P0d3) * t1 / 1000.0))
+            meas = e4 / e1
+            errs.append(abs(100 * (meas / pred - 1)))
+            nulls.append(abs(100 * (meas - 1)))
+            meas_all.append(meas)
+            duties.append(d1)
+    if errs:
+        put("npDutyThreeN", str(len(errs)))
+        put("npDutyThreeExcluded", str(len(excluded)))
+        put("npDutyThreeErrMed", f"{st.median(errs):.1f}")
+        put("npDutyThreeErrMax", f"{max(errs):.1f}")
+        put("npDutyThreeNullMed", f"{st.median(nulls):.1f}")
+        put("npDutyThreeBeats", f"{st.median(nulls)/st.median(errs):.1f}")
+        put("npDutyThreeRatioLo", f"{min(meas_all):.3f}")
+        put("npDutyThreeRatioHi", f"{meas_all[meas_all.index(max(meas_all))]:.3f}")
+        put("npDutyThreeNSave", str(sum(1 for x in meas_all if x < 1)))
+        put("npDutyThreeDutyLo", f"{100*min(duties):.0f}")
+        put("npDutyThreeDutyHi", f"{100*max(duties):.0f}")
+
+# ================ the 1500 MHz anomaly, with the workload removed ===========
+# N spinning processes, no runtime, no memory traffic, no allocator. If the
+# anomaly reproduces here it is the board or the instrument, not the inference.
+_pc = [r for r in load(os.path.join(D2, "E_purecore2.jsonl"))
+       if "P_mean_W" in r]
+if _pc:
+    pb2 = defaultdict(list)
+    for r in _pc:
+        pb2[(r["freq_khz"], r["n_proc"])].append(r)
+    for khz, tag in ((2400000, "TwentyFour"), (1500000, "Fifteen")):
+        pw = {}
+        it = {}
+        for n in (0, 1, 2, 3, 4):
+            v = pb2.get((khz, n))
+            if v:
+                pw[n] = med([x["P_mean_W"] for x in v])
+                it[n] = med([x["iterations"] for x in v])
+        if len(pw) == 5:
+            deltas = [pw[n] - pw[n - 1] for n in (1, 2, 3, 4)]
+            put("npPureLo" + tag, f"{min(deltas):+.2f}")
+            put("npPureHi" + tag, f"{max(deltas):+.2f}")
+            put("npPureNeg" + tag, str(sum(1 for d in deltas if d < 0)))
+            put("npPureSpread" + tag,
+                f"{100*(max(deltas)-min(deltas))/abs(st.mean(deltas)):.0f}")
+            if it.get(4) and it.get(1):
+                put("npPureScale" + tag, f"{it[4]/it[1]:.2f}")
+
 
 put("npOrtVersion", "1.24.3")
 
