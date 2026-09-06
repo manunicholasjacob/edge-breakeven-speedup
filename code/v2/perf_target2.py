@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+"""Counter target with an explicit startup phase.
+
+Run once with n_iter=0 to count session construction plus warm-up, and once
+with n_iter=N to count the same startup plus N inferences. The difference is
+the inference work, which is what the counters in the paper report. The first
+campaign divided whole-process counters by the inference count, which credited
+session construction to the inferences and produced more counted core-cycles
+than the four cores can physically execute.
+"""
+
+import json
+import os
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import numpy as np
+
+from bench import input_spec, make_session
+
+path = sys.argv[1]
+threads = int(sys.argv[2])
+res = int(sys.argv[3]) or None
+n_iter = int(sys.argv[4])
+
+sess = make_session(path, threads)
+name, shape = input_spec(sess, res)
+x = np.random.randn(*shape).astype(np.float32)
+
+for _ in range(10):                      # warm-up, counted in both phases
+    sess.run(None, {name: x})
+
+t0 = time.perf_counter()
+for _ in range(n_iter):
+    sess.run(None, {name: x})
+t1 = time.perf_counter()
+
+print(json.dumps({"n_iter": n_iter, "wall_s": t1 - t0,
+                  "ms_per_inf": (1000.0 * (t1 - t0) / n_iter) if n_iter else 0.0,
+                  "shape": shape, "threads": threads}))
