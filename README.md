@@ -23,7 +23,7 @@ and what is counted in `P`.
 This repository holds **two** campaigns on the same Raspberry Pi 5. They reach opposite
 conclusions, and the second corrects the first.
 
-### `data/` and `code/` — the first campaign (superseded)
+### `data/` and `code/`: the first campaign (superseded)
 
 Six files, 831 PMIC-measured runs. It charged the board's static power to the inference, on the
 stated grounds that the dynamic term was "under 2% of the signal", and concluded that eight
@@ -33,7 +33,7 @@ ImageNet-scale networks clear the break-even bar and save 5-24% energy at four t
 the static floor at each clock instead of assuming it gives 1.72-2.00 W, so the dynamic term is
 44-69% of the signal, not 2%.
 
-### `data/v2/` and `code/v2/` — the second campaign (current)
+### `data/v2/` and `code/v2/`: the second campaign (current)
 
 Twenty-six files from a much larger campaign, and the basis of the current manuscript. It measures
 the static floor at every operating point rather than assuming it, which yields *two* break-even
@@ -86,7 +86,9 @@ for both arms.
 
 `code/v2/fill_numbers_v2.py` regenerates every number in the manuscript from `data/v2/` into a
 single LaTeX macro file, so no figure or table is hand transcribed. `code/v2/figs_v2.py` regenerates
-the figures. The acquisition harnesses are `campaign.py` and `stages2.py` through `stages11.py`;
+the figures. `code/v2/check_headlines.py` runs the generator and exits non-zero if any number quoted in
+this README no longer follows from `data/v2/`; the `reproduce` workflow runs it on every push.
+The acquisition harnesses are `campaign.py` and `stages2.py` through `stages11.py`;
 `bench.py` and `pmic.py` are the shared benchmark core and power sampler.
 
 ## Platform

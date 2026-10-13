@@ -1,0 +1,21 @@
+name: reproduce
+
+# Regenerate the manuscript numbers from data/v2/ and fail if a number quoted in the README drifts.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  headlines:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: README headline numbers recompute from data/v2/ (standard library only)
+        run: python code/v2/check_headlines.py
