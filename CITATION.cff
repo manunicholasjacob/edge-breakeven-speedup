@@ -10,8 +10,8 @@ authors:
 type: software
 repository-code: "https://github.com/manunicholasjacob/edge-breakeven-speedup"
 url: "http://manunicholasjacob.com/"
-version: "1.0.0"
-date-released: "2026-08-17"
+version: "2.0.0"
+date-released: "2026-10-13"
 keywords:
   - "edge computing"
   - "energy efficiency"
