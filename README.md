@@ -97,6 +97,13 @@ ONNX Runtime 1.24.3. Power is the sum of the on-board PMIC's monitored rails, re
 of the board's converters and runs on the machine under test; the manuscript's limitations section
 says what follows from both.
 
+## Citing
+
+This artifact is archived on Zenodo. The concept DOI
+[10.5281/zenodo.21987261](https://doi.org/10.5281/zenodo.21987261)
+always resolves to the latest release, and `CITATION.cff` carries the full metadata,
+which is what GitHub's "Cite this repository" button renders.
+
 ## License
 
 MIT. See `LICENSE`.
