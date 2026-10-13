@@ -1,6 +1,6 @@
 {
   "title": "The Break-Even Parallel Speedup: When Multithreading Saves Energy for Edge CPU Inference",
-  "description": "Public artifact for an IEEE Computer Architecture Letters submission (CAL-2026-08-0285). 831 PMIC-measured runs on a Raspberry Pi 5 (Arm Cortex-A76) establishing when multithreading saves energy on an edge CPU: energy improves exactly when the parallel speedup exceeds the package power ratio. The power ratio is a board constant (1.59 to 1.99x across configurations) while the speedup is a model property (0.95 to 2.63x), so the break-even condition is set by the workload rather than by the platform. Includes raw per-run power and latency records and a stdlib-only analysis pipeline that regenerates every published number from the released data.",
+  "description": "Public artifact for a manuscript under review. PMIC-measured campaigns on a Raspberry Pi 5 (Arm Cortex-A76) on when running DNN inference on more threads saves energy on an edge CPU. Energy at n threads relative to one obeys E_n / E_1 = (P_n / P_1) / S_n, so the empirical questions are how the speedup and the power ratio behave on real hardware and what is counted as power. The current analysis (data/v2/ and code/v2/) measures the static power floor at every operating point and reports the break-even condition both with the floor charged to the inference and without it; the earlier campaign is kept in data/ and code/. Includes raw per-run power and latency records and the analysis pipelines.",
   "creators": [
     {
       "name": "Jacob, Manu Nicholas",
