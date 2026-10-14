@@ -35,7 +35,7 @@ the static floor at each clock instead of assuming it gives 1.72-2.00 W, so the 
 
 ### `data/v2/` and `code/v2/`: the second campaign (current)
 
-Twenty-six files from a much larger campaign, and the basis of the current manuscript. It measures
+Thirty-four files from a much larger campaign, and the basis of the current manuscript. It measures
 the static floor at every operating point rather than assuming it, which yields *two* break-even
 thresholds rather than one:
 
@@ -75,6 +75,9 @@ the stages whose results were negative or which refuted the hypothesis they were
 | `E_duty`, `E_duty2`, `E_duty3` | duty-cycled deployment; see the note below |
 | `E_clockv` | delivered ARM clock and core voltage read from the firmware |
 | `E_bimodal`, `E_isolate` | a slow-mode incidence run, and the sampler pinned off the workload's cores |
+| `E_samplerate` | one cell at four sampler periods (23, 50, 100 and 200 ms), to check whether the sampler perturbs the power it reports |
+| `E_floordrift` | forty back-to-back 30 s idle windows at 2.4 GHz: how far the static floor drifts within a session |
+| `E_purecore2` | zero to four processes on a floating-point loop with no inference workload, at 1500 and 2400 MHz: a check of the summed PMIC rails, whose 1500 MHz result is why every 1500 MHz power quantity is withdrawn from the manuscript |
 
 **A note on `E_duty2`.** That run holds the *duty cycle* constant rather than the period, which
 means the two thread counts do not serve the same number of inferences and their energy-per-inference
